@@ -282,4 +282,6 @@ class ImagePreprocessor:
             np.linalg.norm(tr - br),
             np.linalg.norm(tl - bl),
         ))
+        width = max(width, 1)
+        height = max(height, 1)
         return rect, (width, height)

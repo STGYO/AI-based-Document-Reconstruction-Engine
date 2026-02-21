@@ -115,6 +115,18 @@ class DocumentReconstructionPipeline:
         """
         log_memory_usage(f"page_{page_num}_start")
         try:
+            if image is None or image.size == 0:
+                logger.error(f"Page {page_num}: empty or None image")
+                return {
+                    "page_num": page_num,
+                    "blocks": [],
+                    "ocr_results": [],
+                    "tables": [],
+                    "ocr_confidence": 0.0,
+                    "layout_confidence": 0.0,
+                    "final_score": 0.0,
+                }
+
             # Step 1: Preprocess
             preprocessor = self._get_preprocessor()
             preprocessed = preprocessor.process(image)
@@ -173,6 +185,7 @@ class DocumentReconstructionPipeline:
 
             page_data = {
                 "page_num": page_num,
+                "image": layout_input,
                 "blocks": [
                     {
                         "type": b.block_type,
@@ -294,11 +307,10 @@ class DocumentReconstructionPipeline:
                 for page in pages:
                     for block in page.get("blocks", []):
                         block_type = block.get("type", "text")
-                        text = ""
-                        # Gather OCR text from matching bbox (best effort)
-                        for res in page.get("ocr_results", []):
-                            text += res.get("text", "") + " "
-                        text = text.strip()
+                        bbox = tuple(block.get("bbox", []))
+                        text = self._text_for_block(
+                            bbox, page.get("ocr_results", [])
+                        )
                         if block_type == "title":
                             builder.add_heading(text or "[Title]", level=1)
                         else:
@@ -325,6 +337,19 @@ class DocumentReconstructionPipeline:
         except Exception as exc:
             logger.error(f"JSON build failed: {exc}")
 
+        try:
+            if self._config.export_pdf:
+                pdf_path = os.path.join(out_dir, f"{output_prefix}.pdf")
+                pbuilder = PDFBuilder(pdf_path)
+                for page in pages:
+                    img = page.get("image")
+                    if img is not None:
+                        pbuilder.add_page(img)
+                if pbuilder._pages:
+                    outputs["pdf"] = pbuilder.save()
+        except Exception as exc:
+            logger.error(f"PDF build failed: {exc}")
+
         return outputs
 
     # ------------------------------------------------------------------
@@ -338,3 +363,37 @@ class DocumentReconstructionPipeline:
         if len(image.shape) == 2:
             return cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
         return image
+
+    @staticmethod
+    def _text_for_block(
+        block_bbox: tuple, ocr_results: list
+    ) -> str:
+        """Return OCR text whose bounding box overlaps with the block bbox.
+
+        When *block_bbox* is empty or ``None``, **all** OCR text is returned
+        as a concatenated fallback (e.g. when layout detection is unavailable).
+
+        Args:
+            block_bbox: ``(x1, y1, x2, y2)`` of the layout block, or empty.
+            ocr_results: List of OCR result dicts with ``bbox`` and ``text``.
+
+        Returns:
+            Concatenated text from overlapping OCR results.
+        """
+        if not block_bbox or len(block_bbox) < 4 or not ocr_results:
+            # Fallback: return all OCR text when no spatial info available
+            parts = [r.get("text", "") for r in ocr_results]
+            return " ".join(parts).strip()
+
+        bx1, by1, bx2, by2 = block_bbox
+        parts: list = []
+        for res in ocr_results:
+            rbbox = res.get("bbox")
+            if rbbox is None:
+                parts.append(res.get("text", ""))
+                continue
+            rx1, ry1, rx2, ry2 = rbbox
+            # Check overlap
+            if rx2 > bx1 and rx1 < bx2 and ry2 > by1 and ry1 < by2:
+                parts.append(res.get("text", ""))
+        return " ".join(parts).strip()
