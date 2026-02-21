@@ -1,0 +1,11 @@
+Metadata-Version: 2.1
+Name: doc-reconstruction-engine
+Version: 0.1.0
+Summary: AI-based Document Reconstruction Engine
+Requires-Python: >=3.9
+Provides-Extra: all
+Provides-Extra: dl
+Provides-Extra: layout
+Provides-Extra: ocr
+Provides-Extra: ui
+License-File: LICENSE
