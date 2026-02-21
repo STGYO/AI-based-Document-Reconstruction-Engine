@@ -259,7 +259,7 @@ class ImagePreprocessor:
         return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
     @staticmethod
-    def _order_points(pts: np.ndarray):
+    def _order_points(pts: np.ndarray) -> tuple:
         """Order four points: top-left, top-right, bottom-right, bottom-left.
 
         Returns:

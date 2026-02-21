@@ -191,7 +191,10 @@ class PDFBuilder:
             page_w, page_h = A4
 
             for img_bgr in self._pages:
-                img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB) if len(img_bgr.shape) == 3 else img_bgr
+                if len(img_bgr.shape) == 2:
+                    img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_GRAY2RGB)
+                else:
+                    img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
                 pil_img = PilImage.fromarray(img_rgb)
                 buf = io.BytesIO()
                 pil_img.save(buf, format="PNG")

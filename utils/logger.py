@@ -10,12 +10,12 @@ class EngineLogger:
     _DATE_FORMAT: str = "%Y-%m-%d %H:%M:%S"
 
     @staticmethod
-    def get_logger(name: str, level: int = logging.DEBUG) -> logging.Logger:
+    def get_logger(name: str, level: int = logging.INFO) -> logging.Logger:
         """Return a configured logger with StreamHandler and standard formatter.
 
         Args:
             name: The logger name (typically ``__name__``).
-            level: The logging level. Defaults to ``logging.DEBUG``.
+            level: The logging level. Defaults to ``logging.INFO``.
 
         Returns:
             A :class:`logging.Logger` instance with a stream handler attached.
