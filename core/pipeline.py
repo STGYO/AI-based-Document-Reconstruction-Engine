@@ -124,7 +124,7 @@ class DocumentReconstructionPipeline:
             enhanced = enhancer.enhance(preprocessed)
 
             # Step 3: Layout detection
-            # Layout detector expects BGR; if enhanced is grayscale convert back
+            # Layout detection — ensure input is BGR (preprocessing may output grayscale)
             layout_input = self._ensure_bgr(enhanced)
             layout_detector = self._get_layout_detector()
             layout_blocks = layout_detector.detect(layout_input)

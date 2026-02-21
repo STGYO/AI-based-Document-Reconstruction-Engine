@@ -10,7 +10,6 @@ logger = logging.getLogger(__name__)
 
 try:
     import torch
-    import torch.nn.functional as F
     _TORCH_AVAILABLE = True
 except ImportError:
     _TORCH_AVAILABLE = False
@@ -88,8 +87,10 @@ class SuperResolutionEnhancer:
                 self._load_model()
             log_memory_usage("sr_start")
             result = self._tile_upsample(image)
-            if _TORCH_AVAILABLE and self._device == "cuda" and torch.cuda.is_available():
-                torch.cuda.empty_cache()
+            if _TORCH_AVAILABLE and self._device == "cuda":
+                import torch as _torch
+                if _torch.cuda.is_available():
+                    _torch.cuda.empty_cache()
             log_memory_usage("sr_end")
             return result
         except Exception as exc:
@@ -139,7 +140,7 @@ class SuperResolutionEnhancer:
     ) -> np.ndarray:
         """Use torch.nn.functional.interpolate for bicubic upscaling."""
         import torch
-        import torch.nn.functional as F  # noqa: F811
+        import torch.nn.functional as F
 
         if is_gray:
             arr = image[np.newaxis, np.newaxis, :, :].astype(np.float32) / 255.0

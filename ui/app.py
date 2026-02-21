@@ -57,7 +57,10 @@ class DocumentReconstructionUI:
                 enable_semantic_correction=enable_semantic,
                 confidence_threshold=confidence_threshold,
                 output_dir=tempfile.mkdtemp(prefix="doc_recon_"),
-                export_pdf=False,  # PDF export requires raw images; skip in UI
+                # PDF pages are built from raw BGR arrays; the pipeline stores
+                # page images internally for that purpose, but the UI only
+                # receives file paths, so PDF export is not available here.
+                export_pdf=False,
             )
             pipeline = DocumentReconstructionPipeline(config)
             # Gradio returns file paths as strings or objects with .name
