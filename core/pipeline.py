@@ -370,14 +370,18 @@ class DocumentReconstructionPipeline:
     ) -> str:
         """Return OCR text whose bounding box overlaps with the block bbox.
 
+        When *block_bbox* is empty or ``None``, **all** OCR text is returned
+        as a concatenated fallback (e.g. when layout detection is unavailable).
+
         Args:
-            block_bbox: ``(x1, y1, x2, y2)`` of the layout block.
+            block_bbox: ``(x1, y1, x2, y2)`` of the layout block, or empty.
             ocr_results: List of OCR result dicts with ``bbox`` and ``text``.
 
         Returns:
             Concatenated text from overlapping OCR results.
         """
-        if not block_bbox or not ocr_results:
+        if not block_bbox or len(block_bbox) < 4 or not ocr_results:
+            # Fallback: return all OCR text when no spatial info available
             parts = [r.get("text", "") for r in ocr_results]
             return " ".join(parts).strip()
 

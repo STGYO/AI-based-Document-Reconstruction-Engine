@@ -115,13 +115,13 @@ pip install -e ".[all]"
 
 ```bash
 # Process document images and produce DOCX + JSON + PDF
-python __main__.py page1.png page2.png --output-dir output
+python -m doc_reconstruction_engine page1.png page2.png --output-dir output
 
 # With super-resolution and semantic correction
-python __main__.py scan.jpg --enable-sr --enable-semantic --output-dir results
+python -m doc_reconstruction_engine scan.jpg --enable-sr --enable-semantic --output-dir results
 
 # Disable specific outputs
-python __main__.py doc.png --no-pdf --no-docx
+python -m doc_reconstruction_engine doc.png --no-pdf --no-docx
 ```
 
 ### Python API
