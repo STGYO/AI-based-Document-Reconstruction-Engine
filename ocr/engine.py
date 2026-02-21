@@ -59,6 +59,8 @@ class OCREngine:
         self._use_gpu = use_gpu
         self._paddle_ocr = None
         self._tesseract_ready: bool = False
+        # Tesseract uses 3-letter codes (e.g. "eng"), PaddleOCR uses "en"
+        self._tesseract_lang = self._map_tesseract_lang(lang)
         logger.info(
             f"OCREngine primary={primary} fallback={fallback} lang={lang}"
         )
@@ -68,17 +70,17 @@ class OCREngine:
     # ------------------------------------------------------------------
 
     def _load_paddle(self) -> None:
-        """Lazy-load PaddleOCR instance."""
+        """Lazy-load PaddleOCR instance.
+
+        Supports both PaddleOCR v2 (``use_angle_cls``, ``use_gpu``) and
+        v3+ (``lang`` only) APIs.
+        """
         if not _PADDLE_AVAILABLE:
             logger.warning("paddleocr is not installed; skipping paddle load")
             return
         try:
-            self._paddle_ocr = PaddleOCR(
-                use_angle_cls=True,
-                lang=self._lang,
-                use_gpu=self._use_gpu,
-                show_log=False,
-            )
+            # PaddleOCR v3+ only accepts 'lang' (and a few model-name args)
+            self._paddle_ocr = PaddleOCR(lang=self._lang)
             logger.info("PaddleOCR loaded successfully")
         except Exception as exc:
             logger.error(f"Failed to load PaddleOCR: {exc}")
@@ -96,6 +98,31 @@ class OCREngine:
         except Exception as exc:
             logger.error(f"Tesseract not functional: {exc}")
             self._tesseract_ready = False
+
+    @staticmethod
+    def _map_tesseract_lang(lang: str) -> str:
+        """Map short language codes to Tesseract 3-letter codes.
+
+        Args:
+            lang: Short language code (e.g. ``"en"``).
+
+        Returns:
+            Tesseract-compatible language code (e.g. ``"eng"``).
+        """
+        mapping = {
+            "en": "eng",
+            "ch": "chi_sim",
+            "fr": "fra",
+            "de": "deu",
+            "es": "spa",
+            "pt": "por",
+            "it": "ita",
+            "ja": "jpn",
+            "ko": "kor",
+            "ru": "rus",
+            "ar": "ara",
+        }
+        return mapping.get(lang, lang)
 
     # ------------------------------------------------------------------
     # Public API
@@ -130,6 +157,8 @@ class OCREngine:
     def _paddle_recognize(self, image: np.ndarray) -> List[dict]:
         """Run PaddleOCR recognition.
 
+        Supports both PaddleOCR v2 (``.ocr()``) and v3+ (``.predict()``) APIs.
+
         Args:
             image: BGR numpy array.
 
@@ -141,8 +170,32 @@ class OCREngine:
                 self._load_paddle()
             if self._paddle_ocr is None:
                 return []
-            raw = self._paddle_ocr.ocr(image, cls=True)
+
             results: List[dict] = []
+
+            # PaddleOCR v3+ uses .predict()
+            if hasattr(self._paddle_ocr, "predict"):
+                raw = self._paddle_ocr.predict(image)
+                if not raw:
+                    return results
+                for item in raw:
+                    rec_texts = getattr(item, "rec_texts", None) or []
+                    rec_scores = getattr(item, "rec_scores", None) or []
+                    dt_polys = getattr(item, "dt_polys", None) or []
+                    for idx, text in enumerate(rec_texts):
+                        conf = float(rec_scores[idx]) if idx < len(rec_scores) else 0.0
+                        if idx < len(dt_polys):
+                            poly = dt_polys[idx]
+                            xs = [pt[0] for pt in poly]
+                            ys = [pt[1] for pt in poly]
+                            bbox = (int(min(xs)), int(min(ys)), int(max(xs)), int(max(ys)))
+                        else:
+                            bbox = (0, 0, 0, 0)
+                        results.append({"text": text, "confidence": conf, "bbox": bbox})
+                return results
+
+            # PaddleOCR v2 uses .ocr()
+            raw = self._paddle_ocr.ocr(image, cls=True)
             if not raw:
                 return results
             for page in raw:
@@ -184,7 +237,7 @@ class OCREngine:
             pil_img = PilImage.fromarray(rgb)
             data = pytesseract.image_to_data(
                 pil_img,
-                lang=self._lang,
+                lang=self._tesseract_lang,
                 output_type=pytesseract.Output.DICT,
             )
             results: List[dict] = []
